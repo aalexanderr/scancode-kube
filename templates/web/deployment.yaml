@@ -1,26 +1,38 @@
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "scancodeio.fullname" . }}-web
   labels:
     {{- include "scancodeio.labels" . | nindent 4 }}
-    app: {{ include "scancodeio.fullname" . }}-web
+    app.kubernetes.io/component: web
 spec:
-  replicas: 1
+  replicas: {{ .Values.web.replicaCount }}
   selector:
     matchLabels:
-      app: {{ include "scancodeio.fullname" . }}-web
+      {{- include "scancodeio.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: web
   strategy:
     type: Recreate
   template:
     metadata:
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
+        checksum/configmap: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        tag: {{ .Values.image.tag | quote }}
       labels:
-        app: {{ include "scancodeio.fullname" . }}-web
+        {{- include "scancodeio.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: web
     spec:
+    {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+      {{- toYaml . | nindent 8 }}
+    {{- end }}
+      serviceAccountName: {{ include "scancodeio.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
       initContainers:
-        - name: wait-for-database
-          image: aalexanderr/scancodeio:v30.2.0-onap2
+        - name: wait-for-postgres
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           env:
             - name: SCANCODEIO_DB_NAME
               valueFrom:
@@ -56,11 +68,34 @@ spec:
             - "./manage.py wait_for_database && \
                ./manage.py migrate"
       containers:
-        - args:
+        - name: {{ .Chart.Name }}
+          args:
             - sh
             - -c
             - "./manage.py collectstatic --no-input --verbosity 0 --clear && \
-               gunicorn scancodeio.wsgi:application --bind :8000 --timeout 600 --workers 8"
+               gunicorn scancodeio.wsgi:application --bind :{{ .Values.web.port  }} --timeout 600 --workers 8"
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.web.port  }}
+              protocol: TCP
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: {{ .Values.web.livenessProbe.initialDelaySeconds }}
+            timeoutSeconds: {{ .Values.web.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.web.livenessProbe.failureThreshold }}
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: {{ .Values.web.readinessProbe.initialDelaySeconds }}
+            timeoutSeconds: {{ .Values.web.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.web.readinessProbe.failureThreshold }}
+          resources:
+            {{- toYaml .Values.web.resources | nindent 12 }}
           env:
             - name: SCANCODEIO_DB_NAME
               valueFrom:
@@ -90,10 +125,6 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "scancodeio.fullname" . }}-scancode-env
-          image: aalexanderr/scancodeio:v30.2.0-onap2
-          name: {{ include "scancodeio.fullname" . }}-web
-          ports:
-            - containerPort: 8000
           volumeMounts:
             - mountPath: /etc/scancodeio/
               name: {{ include "scancodeio.fullname" . }}-web-claim
@@ -107,18 +138,15 @@ spec:
         - name: {{ include "scancodeio.fullname" . }}-workspace-claim
           persistentVolumeClaim:
             claimName: {{ include "scancodeio.fullname" . }}-workspace-claim
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    app: {{ include "scancodeio.fullname" . }}-web
-  name: {{ .Release.Name }}-scancodeio-web
-spec:
-  selector:
-    app: {{ include "scancodeio.fullname" . }}-web
-  type: ClusterIP
-  ports:
-    - port: 8000
-      targetPort: 8000
+    {{- with .Values.web.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.web.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.web.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}

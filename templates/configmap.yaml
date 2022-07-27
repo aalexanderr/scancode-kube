@@ -9,11 +9,13 @@ metadata:
 data:
   SCANCODEIO_ASYNC: "True"
   SCANCODEIO_DB_HOST:
-    "{{ .Release.Name }}-postgresql.{{- .Release.Namespace }}.svc.cluster.local"
+  # get fullname from .Subcharts.postgresql
+    "{{ .Release.Name }}-postgresql.{{- .Release.Namespace }}.svc.{{ .Values.clusterZone }}"
   SCANCODEIO_REDIS_HOST:
-    "{{ .Release.Name }}-redis-master.{{- .Release.Namespace }}.svc.cluster.local"
+    "{{ .Release.Name }}-redis-master.{{- .Release.Namespace }}.svc.{{ .Values.clusterZone }}"
   SCANCODEIO_WORKSPACE_LOCATION: /var/scancodeio/workspace/
   SCANCODEIO_REQUIRE_AUTHENTICATION: "False"
+  #ALLOWED_HOSTS: ".{{ .Values.clusterZone }},localhost,127.0.0.1,[::1]"
   ALLOWED_HOSTS: "*,localhost,127.0.0.1,[::1]"
   SCANCODEIO_DEBUG: "False"
   SCANCODEIO_PROCESSES: "2"

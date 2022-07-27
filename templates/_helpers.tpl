@@ -1,3 +1,5 @@
+{{/* vim: set filetype=mustache: */}}
+
 {{/*
 Expand the name of the chart.
 */}}
@@ -20,6 +22,44 @@ If release name contains chart name it will be used as a full name.
 {{- else }}
 {{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
 {{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
+Create chart name and version as used by the chart label.
+*/}}
+{{- define "scancodeio.chart" -}}
+{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
+Common labels
+*/}}
+{{- define "scancodeio.labels" -}}
+helm.sh/chart: {{ include "scancodeio.chart" . }}
+{{ include "scancodeio.selectorLabels" . }}
+{{- if .Chart.AppVersion }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- end }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+
+{{/*
+Selector labels
+*/}}
+{{- define "scancodeio.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "scancodeio.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+
+{{/*
+Create the name of the service account to use
+*/}}
+{{- define "scancodeio.serviceAccountName" -}}
+{{- if .Values.serviceAccount.create }}
+{{- default (include "scancodeio.fullname" .) .Values.serviceAccount.name }}
+{{- else }}
+{{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
 
@@ -68,43 +108,5 @@ If release name contains chart name it will be used as a full name.
 {{- .Values.scancodeSCANCODEIO_REDIS_PASSWORD | trunc 63 | trimSuffix "-" }}
 {{- else }}
 {{- randAlphaNum 32 | b64enc | quote }}
-{{- end }}
-{{- end }}
-
-{{/*
-Create chart name and version as used by the chart label.
-*/}}
-{{- define "scancodeio.chart" -}}
-{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
-{{- end }}
-
-{{/*
-Common labels
-*/}}
-{{- define "scancodeio.labels" -}}
-helm.sh/chart: {{ include "scancodeio.chart" . }}
-{{ include "scancodeio.selectorLabels" . }}
-{{- if .Chart.AppVersion }}
-app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-{{- end }}
-app.kubernetes.io/managed-by: {{ .Release.Service }}
-{{- end }}
-
-{{/*
-Selector labels
-*/}}
-{{- define "scancodeio.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "scancodeio.name" . }}
-app.kubernetes.io/instance: {{ .Release.Name }}
-{{- end }}
-
-{{/*
-Create the name of the service account to use
-*/}}
-{{- define "scancodeio.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create }}
-{{- default (include "scancodeio.fullname" .) .Values.serviceAccount.name }}
-{{- else }}
-{{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}

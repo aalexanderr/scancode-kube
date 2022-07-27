@@ -2,26 +2,26 @@ apiVersion: v2
 name: scancodeio
 description: A Helm chart for Kubernetes deployment of ScanCode.io
 type: application
-
-version: 0.1.0
+version: 0.3.0
 appVersion: "30.2.0"
-#kubeVersion: "1.23.3-2+d441060727c463"
-#kubeVersion: ">=1.23.0"
+
+kubeVersion: ">=1.23.0"
 
 dependencies:
   - name: nginx
     repository: https://charts.bitnami.com/bitnami
-    version: 9.x.x
+    version: ~13.1.4
   - name: postgresql
     repository: https://charts.bitnami.com/bitnami
-    version: 11.x.x
+    version: ~11.6.25
+    condition: postgresql.enabled
   - name: redis
     repository: https://charts.bitnami.com/bitnami
-    version: 16.x.x
+    version: ~17.0.6
+    condition: redis.enabled
 
 keywords:
   - open source
-  - scancode
   - license
   - dependency
   - filetype

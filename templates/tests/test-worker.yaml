@@ -15,7 +15,7 @@ spec:
       args:
       - '-c'
       - |
-        export URL="http://{{ .Release.Name }}-scancodeio-web.{{- .Release.Namespace }}.svc.cluster.local:8000/api/projects/";
+        export URL="http://{{ include "scancodeio.fullname" . }}-web.{{- .Release.Namespace }}.svc.{{ .Values.clusterZone }}:{{ .Values.web.service.port }}/api/projects/";
         echo "url: $URL";
         set -x;
         sleep 60
@@ -28,5 +28,4 @@ spec:
         jq '.results[] | select(.name == "test") | select(.runs[0].status == "running")' -e && \
         curl -L -X DELETE "${URL}$(cat uuid | sed 's/\"//g')/"  \
         -H "Content-Type: application/json"
-
   restartPolicy: Never

@@ -3,6 +3,10 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+# For FQDN resolving of the controller service. Change this value to match your existing configuration.
+# ref: https://github.com/kubernetes/dns/blob/master/docs/specification.md
+clusterZone: "cluster.local"
+
 scancodeDatabase: scancode-db
 scancodeUsername: scancode-user
 # change default password
@@ -10,20 +14,75 @@ scancodePassword: scancode-pwd
 # change default password
 scancodePostgresPassword: scancode-admin-pwd
 # change default secret key
-scancodeSECRET_KEY: sBWLZ0ryiaO15842p0yMS//Zhh7K66wwxn0MmPLwI7nfRPLe/Y
+scancodeSECRET_KEY: ""
 # change default password
 scancodeSCANCODEIO_REDIS_PASSWORD: scancode-redis-pwd
 
-replicaCount: 1
+env:
+  plain: {}
+  secret: {}
 
 image:
-  repository: nginx
+  repository: aalexanderr/scancodeio
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
+  tag: "v30.2.0-onap2"
 
+imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
+
+web:
+  replicaCount: 1
+  port: 8000
+  # We usually recommend not to specify default resources and to leave this
+  # as a conscious choice for the user. This also increases chances charts
+  # run on environments with little resources, such as Minikube.
+  # If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary,
+  # and remove the curly braces after 'resources:'.
+  resources: {}
+    # limits:
+    #   cpu: 1000m
+    #   memory: 512Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
+  livenessProbe:
+    failureThreshold: 5
+    initialDelaySeconds: 5
+    timeoutSeconds: 2
+  readinessProbe:
+    failureThreshold: 10
+    initialDelaySeconds: 5
+    timeoutSeconds: 2
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  service:
+    type: ClusterIP
+    port: 8080
+
+
+worker:
+  replicaCount: 1
+  # We usually recommend not to specify default resources and to leave this
+  # as a conscious choice for the user. This also increases chances charts
+  # run on environments with little resources, such as Minikube.
+  # If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary,
+  # and remove the curly braces after 'resources:'.
+  resources: {}
+    # limits:
+    #   cpu: 900m
+    #   memory: 768Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
 
 serviceAccount:
   # Specifies whether a service account should be created
@@ -40,6 +99,7 @@ securityContext: {}
 #   drop:
 #   - ALL
 # readOnlyRootFilesystem: true
+# allowPrivilegeEscalation: false
 # runAsNonRoot: true
 # runAsUser: 1000
 
@@ -58,34 +118,18 @@ ingress:
   #    hosts:
   #      - chart-example.local
 
-resources: {}
-# We usually recommend not to specify default resources and to leave this
-# as a conscious choice for the user. This also increases chances charts
-# run on environments with little resources, such as Minikube.
-# If you do want to specify resources, uncomment the following
-# lines, adjust them as necessary,
-# and remove the curly braces after 'resources:'.
-# limits:
-#   cpu: 100m
-#   memory: 128Mi
-# requests:
-#   cpu: 100m
-#   memory: 128Mi
-
-autoscaling:
-  enabled: false
-  minReplicas: 1
-  maxReplicas: 100
-  targetCPUUtilizationPercentage: 80
-  # targetMemoryUtilizationPercentage: 80
 
 postgresql:
+  # TODO: mention what should be set from SCIO side of chart for own deployment
+  enabled: true
   auth:
     username: scancode-user
     database: scancode-db
     existingSecret: scancode-secret
 
 redis:
+  # TODO: mention what should be set from SCIO side of chart for own deployment
+  enabled: true
   architecture: standalone
   auth:
     enabled: true
@@ -93,27 +137,17 @@ redis:
     existingSecretPasswordKey: SCANCODEIO_REDIS_PASSWORD
 
 nginx:
-  ## @param extraVolumes Array to add extra volumes
-  ##
-  #  extraVolumes:
-  #    - name: staticsite
-  #      hostPath:
-  #        path: /data/static/
-  #        type: Directory
   service:
     type: NodePort
   extraVolumes:
     - name: "{{ .Release.Name }}-staticsite"
       persistentVolumeClaim:
         claimName: "{{ .Release.Name }}-staticsite"
-  # @param extraVolumeMounts Array to add extra mount
-  #
   extraVolumeMounts:
     - mountPath: /static
       name: "{{ .Release.Name }}-staticsite"
 
-  ## @param initContainers Extra init containers
-  ##
+  # TODO: switch to managestatic
   initContainers:
     - name: populate-static
       image: eeproton/scancodeio_web
@@ -132,36 +166,4 @@ nginx:
         - mountPath: /static
           name: "{{ .Release.Name }}-staticsite"
 
-
-  ## @param serverBlock Custom server block to be added to NGINX configuration
-  serverBlock: |-
-    server {
-      listen 0.0.0.0:8080;
-      root /app;
-      location / {
-        proxy_pass http://{{ .Release.Name }}-scancodeio-web:8000/;
-        proxy_redirect off;
-        client_max_body_size 10G;
-        proxy_read_timeout 600s;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Host $host:$server_port;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Host $host;
-      }
-
-      location /static/admin/ {
-        alias /static/scancodeio-static/static/admin/;
-      }
-      location /static/rest_framework {
-        alias /static/scancodeio-static/static/rest_framework;
-      }
-      location /static/ {
-        alias /static/scancodeio/static/;
-      }
-      location /status {
-        stub_status on;
-        access_log   off;
-        allow 127.0.0.1;
-        deny all;
-      }
-    }
+  existingServerBlockConfigmap: scancodeio-nginx
